@@ -7,7 +7,7 @@
 #include <swiftly-ext/extension.h>
 #include <swiftly-ext/hooks/NativeHooks.h>
 
-class BaseExtension : public SwiftlyExt
+class UtilsExtension : public SwiftlyExt
 {
 public:
     bool Load(std::string& error, SourceHook::ISourceHook *SHPtr, ISmmAPI* ismm, bool late);
@@ -26,7 +26,7 @@ public:
     const char* GetWebsite();
 };
 
-extern BaseExtension g_Ext;
+extern UtilsExtension g_Ext;
 DECLARE_GLOBALVARS();
 
 #endif
