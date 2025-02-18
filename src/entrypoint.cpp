@@ -1,8 +1,5 @@
 #include "entrypoint.h"
-#include <lua/lua.h>
-#include <lua/lauxlib.h>
-#include <lua/lualib.h>
-#include <LuaBridge/LuaBridge.h>
+#include <Embedder.h>
 #include "utilsclass.h"
 #include <ehandle.h>
 #include "sdk/services.h"
@@ -133,31 +130,25 @@ void UtilsExtension::AllPluginsLoaded()
 
 bool UtilsExtension::OnPluginLoad(std::string pluginName, void* pluginState, PluginKind_t kind, std::string& error)
 {
+    EContext* state = (EContext*)pluginState;
 
-    if (kind == PluginKind_t::Lua) {
-        lua_State* state = (lua_State*)pluginState;
+    BeginClass<PlayerUtils>("PlayerUtils", state)
+        .addConstructor<std::string>()
+        .addFunction("SetBunnyhop", &PlayerUtils::SetBunnyhop)
+        .addFunction("GetBunnyhop", &PlayerUtils::GetBunnyhop)
+        .addFunction("IsListeningToGameEvent", &PlayerUtils::IsListeningToGameEvent)
+    .endClass();
 
-        luabridge::getGlobalNamespace(state)
-            .beginClass<PlayerUtils>("PlayerUtils")
-            .addConstructor<void (*)(std::string)>()
-            .addFunction("SetBunnyhop", &PlayerUtils::SetBunnyhop)
-            .addFunction("GetBunnyhop", &PlayerUtils::GetBunnyhop)
-            .addFunction("IsListeningToGameEvent", &PlayerUtils::IsListeningToGameEvent)
-            .endClass();
-
-        luaL_dostring(state, "playerutils = PlayerUtils(GetCurrentPluginName())");
-    }
+    GetGlobalNamespace(state).addConstant("playerutils", PlayerUtils(pluginName));
 
     return true;
 }
 
 bool UtilsExtension::OnPluginUnload(std::string pluginName, void* pluginState, PluginKind_t kind, std::string& error)
 {
-    if (kind == PluginKind_t::Lua) {
-        lua_State* state = (lua_State*)pluginState;
+    EContext* state = (EContext*)pluginState;
 
-        luaL_dostring(state, "playerutils = nil");
-    }
+    GetGlobalNamespace(state).addConstant("playerutils", nullptr);
     return true;
 }
 
