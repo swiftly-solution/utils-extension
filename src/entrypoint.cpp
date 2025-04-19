@@ -1,32 +1,33 @@
 #include "entrypoint.h"
-#include <Embedder.h>
-#include "utilsclass.h"
+#include <embedder/src/embedder.h>
 #include <ehandle.h>
 #include "sdk/services.h"
-
+#include "sdk/CRecipientFilters.h"
+#include "networkbasetypes.pb.h"
 #include <swiftly-ext/sdk.h>
+#include <swiftly-ext/memory.h>
 
-void Hook_CCSPlayer_MovementServices_CheckJumpPre(void* services, void* movementData);
+dyno::ReturnAction Hook_CCSPlayer_MovementServices_CheckJumpPre(dyno::CallbackType cbType, dyno::IHook& hook);
 
 //////////////////////////////////////////////////////////////
 /////////////////        Core Variables        //////////////
 ////////////////////////////////////////////////////////////
 
-SH_DECL_HOOK5_void(IServerGameClients, ClientDisconnect, SH_NOATTRIB, 0, CPlayerSlot, ENetworkDisconnectionReason, const char *, uint64, const char *);
+SH_DECL_HOOK5_void(IServerGameClients, ClientDisconnect, SH_NOATTRIB, 0, CPlayerSlot, ENetworkDisconnectionReason, const char*, uint64, const char*);
 SH_DECL_HOOK2(IGameEventManager2, LoadEventsFromFile, SH_NOATTRIB, 0, int, const char*, bool);
 
 int loadEventFromFileHookID = -1;
-IServerGameClients *gameclients = nullptr;
+IServerGameClients* gameclients = nullptr;
 IGameEventManager2* g_gameEventManager = nullptr;
 IGameEventSystem* g_pGameEventSystem = nullptr;
 IVEngineServer2* engine = nullptr;
 ICvar* icvar = nullptr;
 
 UtilsExtension g_Ext;
-CUtlVector<FuncHookBase*> g_vecHooks;
 CREATE_GLOBALVARS();
 
-FuncHook<decltype(Hook_CCSPlayer_MovementServices_CheckJumpPre)> TCCSPlayer_MovementServices_CheckJumpPre(Hook_CCSPlayer_MovementServices_CheckJumpPre, "CCSPlayer_MovementServices_CheckJumpPre");
+FunctionHook CCSPlayer_MovementServices_CheckJumpPre("CCSPlayer_MovementServices_CheckJumpPre", dyno::CallbackType::Pre, Hook_CCSPlayer_MovementServices_CheckJumpPre, "pp", 'v');
+FunctionHook CCSPlayer_MovementServices_CheckJumpPost("CCSPlayer_MovementServices_CheckJumpPre", dyno::CallbackType::Post, Hook_CCSPlayer_MovementServices_CheckJumpPre, "pp", 'v');
 
 ConVar* autobunnyhoppingcvar = nullptr;
 
@@ -37,11 +38,8 @@ ConVar* autobunnyhoppingcvar = nullptr;
 EXT_EXPOSE(g_Ext);
 bool UtilsExtension::Load(std::string& error, SourceHook::ISourceHook* SHPtr, ISmmAPI* ismm, bool late)
 {
-    SAVE_GLOBALVARS();
-    if (!InitializeHooks()) {
-        error = "Failed to initialize hooks.";
-        return false;
-    }
+    g_SHPtr = SHPtr;
+    g_SMAPI = ismm;
 
     GET_IFACE_CURRENT(GetEngineFactory, engine, IVEngineServer, INTERFACEVERSION_VENGINESERVER);
     GET_IFACE_CURRENT(GetEngineFactory, icvar, ICvar, CVAR_INTERFACE_VERSION);
@@ -59,18 +57,18 @@ bool UtilsExtension::Load(std::string& error, SourceHook::ISourceHook* SHPtr, IS
 
 int UtilsExtension::LoadEventsFromFile(const char* filePath, bool searchAll)
 {
-    if(!g_gameEventManager) {
+    if (!g_gameEventManager) {
         g_gameEventManager = META_IFACEPTR(IGameEventManager2);
     }
 
     RETURN_META_VALUE(MRES_IGNORED, 0);
 }
 
-extern uint64_t bhop_state;
+uint64_t bhop_state = 0;
 
-void UtilsExtension::Hook_ClientDisconnect( CPlayerSlot slot, ENetworkDisconnectionReason reason, const char *pszName, uint64 xuid, const char *pszNetworkID )
+void UtilsExtension::Hook_ClientDisconnect(CPlayerSlot slot, ENetworkDisconnectionReason reason, const char* pszName, uint64 xuid, const char* pszNetworkID)
 {
-    if((bhop_state & (1ULL << slot.Get())) != 0) bhop_state &= ~(1ULL << slot.Get());
+    if ((bhop_state & (1ULL << slot.Get())) != 0) bhop_state &= ~(1ULL << slot.Get());
 }
 
 ConVar* FetchCVar(std::string cvarname)
@@ -85,8 +83,10 @@ ConVar* FetchCVar(std::string cvarname)
     return icvar->GetConVar(cvarHandle);
 }
 
-void Hook_CCSPlayer_MovementServices_CheckJumpPre(void* services, void* movementData)
+dyno::ReturnAction Hook_CCSPlayer_MovementServices_CheckJumpPre(dyno::CallbackType cbType, dyno::IHook& hook)
 {
+    void* services = hook.getArgument<void*>(0);
+
     if (autobunnyhoppingcvar == nullptr)
         autobunnyhoppingcvar = FetchCVar("sv_autobunnyhopping");
 
@@ -96,17 +96,13 @@ void Hook_CCSPlayer_MovementServices_CheckJumpPre(void* services, void* movement
     {
         CHandle<CEntityInstance> controller = SDKGetProp<CHandle<CEntityInstance>>(((CPlayer_MovementServices*)services)->m_pPawn, "CBasePlayerPawn", "m_hController");
         int pid = controller.GetEntryIndex() - 1;
-        if((bhop_state & (1ULL << pid)) != 0) {
-            autobunnyhopping = true;
-
-            TCCSPlayer_MovementServices_CheckJumpPre(services, movementData);
-
-            autobunnyhopping = false;
-            return;
+        if ((bhop_state & (1ULL << pid)) != 0) {
+            autobunnyhopping = (cbType == dyno::CallbackType::Pre);
+            return dyno::ReturnAction::Ignored;
         }
     }
 
-    TCCSPlayer_MovementServices_CheckJumpPre(services, movementData);
+    return dyno::ReturnAction::Ignored;
 }
 
 bool UtilsExtension::Unload(std::string& error)
@@ -114,7 +110,6 @@ bool UtilsExtension::Unload(std::string& error)
     SH_REMOVE_HOOK_ID(loadEventFromFileHookID);
     SH_REMOVE_HOOK_MEMFUNC(IServerGameClients, ClientDisconnect, gameclients, this, &UtilsExtension::Hook_ClientDisconnect, true);
 
-    UnloadHooks();
     return true;
 }
 
@@ -130,25 +125,73 @@ void UtilsExtension::AllPluginsLoaded()
 
 bool UtilsExtension::OnPluginLoad(std::string pluginName, void* pluginState, PluginKind_t kind, std::string& error)
 {
-    EContext* state = (EContext*)pluginState;
+    EContext* ctx = (EContext*)pluginState;
 
-    BeginClass<PlayerUtils>("PlayerUtils", state)
-        .addConstructor<std::string>()
-        .addFunction("SetBunnyhop", &PlayerUtils::SetBunnyhop)
-        .addFunction("GetBunnyhop", &PlayerUtils::GetBunnyhop)
-        .addFunction("IsListeningToGameEvent", &PlayerUtils::IsListeningToGameEvent)
-    .endClass();
+    ADD_CLASS("PlayerUtils");
 
-    GetGlobalNamespace(state).addConstant("playerutils", PlayerUtils(pluginName));
+#ifndef _WIN32
+    ADD_CLASS_FUNCTION("PlayerUtils", "SetBunnyhop", [](FunctionContext* context, ClassData* data) -> void {
+        int playerid = context->GetArgumentOr<int>(0, -1);
+        bool state = context->GetArgumentOr<bool>(1, false);
+
+        if (state == true) bhop_state |= (1ULL << playerid);
+        else bhop_state &= ~(1ULL << playerid);
+
+        INetworkMessageInternal* netmsg = g_pNetworkMessages->FindNetworkMessagePartial("SetConVar");
+        auto msg = netmsg->AllocateMessage()->ToPB<CNETMsg_SetConVar>();
+        CMsg_CVars_CVar* cvar = msg->mutable_convars()->add_cvars();
+        cvar->set_name("sv_autobunnyhopping");
+        cvar->set_value(state == true ? "true" : "false");
+
+        CSingleRecipientFilter filter(playerid);
+        g_pGameEventSystem->PostEventAbstract(-1, false, &filter, netmsg, msg, 0);
+
+        delete msg;
+        });
+#else
+    ADD_CLASS_FUNCTION("PlayerUtils", "SetBunnyhop", [](FunctionContext* context, ClassData* data) -> void {
+        int playerid = context->GetArgumentOr<int>(0, -1);
+        bool state = context->GetArgumentOr<bool>(1, false);
+
+        if (state == true) bhop_state |= (1ULL << playerid);
+        else bhop_state &= ~(1ULL << playerid);
+
+        INetworkMessageInternal* netmsg = g_pNetworkMessages->FindNetworkMessagePartial("SetConVar");
+        auto msg = netmsg->AllocateMessage()->ToPB<CNETMsg_SetConVar>();
+        CMsg_CVars_CVar* cvar = msg->mutable_convars()->add_cvars();
+        cvar->set_name("sv_autobunnyhopping");
+        cvar->set_value(state == true ? "true" : "false");
+
+        CSingleRecipientFilter filter(playerid);
+        g_pGameEventSystem->PostEventAbstract(-1, false, &filter, netmsg, msg, 0);
+        });
+#endif
+
+    ADD_CLASS_FUNCTION("PlayerUtils", "IsListeningToGameEvent", [](FunctionContext* context, ClassData* data) -> void {
+        int playerid = context->GetArgumentOr<int>(0, -1);
+        std::string game_event = context->GetArgumentOr<std::string>(1, "");
+
+        void* getListener = GetSignature("LegacyGameEventListener");
+        if (!getListener) return context->SetReturn(false);
+
+        IGameEventListener2* playerListener = reinterpret_cast<IGameEventListener2 * (*)(int)>(getListener)(playerid);
+        if (!playerListener) return context->SetReturn(false);
+
+        return context->SetReturn(g_gameEventManager->FindListener(playerListener, game_event.c_str()));
+        });
+
+    ADD_CLASS_FUNCTION("PlayerUtils", "GetBunnyhop", [](FunctionContext* context, ClassData* data) -> void {
+        int playerid = context->GetArgumentOr<int>(0, -1);
+        context->SetReturn(((bhop_state & (1ULL << playerid)) != 0));
+        });
+
+    ADD_VARIABLE("_G", "playerutils", MAKE_CLASS_INSTANCE_CTX(ctx, "PlayerUtils", {}));
 
     return true;
 }
 
 bool UtilsExtension::OnPluginUnload(std::string pluginName, void* pluginState, PluginKind_t kind, std::string& error)
 {
-    EContext* state = (EContext*)pluginState;
-
-    GetGlobalNamespace(state).addConstant("playerutils", nullptr);
     return true;
 }
 

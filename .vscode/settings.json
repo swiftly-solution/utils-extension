@@ -67,6 +67,8 @@
         "typeinfo": "cpp",
         "any": "cpp",
         "optional": "cpp",
-        "codecvt": "cpp"
+        "codecvt": "cpp",
+        "xstring": "cpp",
+        "xlocbuf": "cpp"
     }
 }

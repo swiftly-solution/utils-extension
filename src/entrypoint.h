@@ -11,21 +11,22 @@
 
 #include <swiftly-ext/core.h>
 #include <swiftly-ext/extension.h>
-#include <swiftly-ext/hooks/NativeHooks.h>
+#include <swiftly-ext/hooks/function.h>
+#include <swiftly-ext/hooks/vfunction.h>
 
 class UtilsExtension : public SwiftlyExt
 {
 public:
-    bool Load(std::string& error, SourceHook::ISourceHook *SHPtr, ISmmAPI* ismm, bool late);
+    bool Load(std::string& error, SourceHook::ISourceHook* SHPtr, ISmmAPI* ismm, bool late);
     bool Unload(std::string& error);
-    
+
     void AllExtensionsLoaded();
     void AllPluginsLoaded();
 
     bool OnPluginLoad(std::string pluginName, void* pluginState, PluginKind_t kind, std::string& error);
     bool OnPluginUnload(std::string pluginName, void* pluginState, PluginKind_t kind, std::string& error);
 
-    void Hook_ClientDisconnect( CPlayerSlot slot, ENetworkDisconnectionReason reason, const char *pszName, uint64 xuid, const char *pszNetworkID );
+    void Hook_ClientDisconnect(CPlayerSlot slot, ENetworkDisconnectionReason reason, const char* pszName, uint64 xuid, const char* pszNetworkID);
     int LoadEventsFromFile(const char* filePath, bool searchAll);
 
 public:
