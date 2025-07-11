@@ -1,0 +1,11 @@
+{
+    "kind": "function",
+    "function": "IsListeningToGameEvent",
+    "description": "Checks if a client is listening to the specified game event.",
+    "arguments": {
+        "playerid": "int32",
+        "event_name": "string"
+    },
+    "return": "bool",
+    "games": "all"
+}

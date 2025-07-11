@@ -1,0 +1,10 @@
+{
+    "kind": "function",
+    "function": "GetBunnyhop",
+    "description": "Returns the status of the bunnyhop feature for a player.",
+    "arguments": {
+        "playerid": "int32"
+    },
+    "return": "bool",
+    "games": "all"
+}

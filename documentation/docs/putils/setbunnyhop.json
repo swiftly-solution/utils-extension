@@ -1,0 +1,11 @@
+{
+    "kind": "function",
+    "function": "SetBunnyhop",
+    "description": "Sets the bunnyhop feature to a player.",
+    "arguments": {
+        "playerid": "int32",
+        "state": "bool"
+    },
+    "return": "void",
+    "games": "all"
+}
