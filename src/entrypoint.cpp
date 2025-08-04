@@ -144,7 +144,7 @@ bool UtilsExtension::OnPluginLoad(std::string pluginName, void* pluginState, Plu
         cvar->set_value(state == true ? "true" : "false");
 
         CSingleRecipientFilter filter(playerid);
-        g_pGameEventSystem->PostEventAbstract(-1, false, &filter, netmsg, msg, 0);
+        g_pGameEventSystem->PostEventAbstract(-1, false, (IRecipientFilter*)(&filter), netmsg, msg, 0);
 
         delete msg;
         });
@@ -163,7 +163,7 @@ bool UtilsExtension::OnPluginLoad(std::string pluginName, void* pluginState, Plu
         cvar->set_value(state == true ? "true" : "false");
 
         CSingleRecipientFilter filter(playerid);
-        g_pGameEventSystem->PostEventAbstract(-1, false, &filter, netmsg, msg, 0);
+        g_pGameEventSystem->PostEventAbstract(-1, false, (IRecipientFilter*)(&filter), netmsg, msg, 0);
         });
 #endif
 
@@ -216,5 +216,5 @@ const char* UtilsExtension::GetVersion()
 
 const char* UtilsExtension::GetWebsite()
 {
-    return "https://swiftlycs2.net/";
+    return "https://swiftlys2.net/";
 }
