@@ -129,6 +129,8 @@ bool UtilsExtension::OnPluginLoad(std::string pluginName, void* pluginState, Plu
 
     ADD_CLASS("PlayerUtils");
 
+    ADD_CLASS_FUNCTION("PlayerUtils", "PlayerUtils", [](FunctionContext* context, ClassData* data) -> void {});
+
 #ifndef _WIN32
     ADD_CLASS_FUNCTION("PlayerUtils", "SetBunnyhop", [](FunctionContext* context, ClassData* data) -> void {
         int playerid = context->GetArgumentOr<int>(0, -1);
