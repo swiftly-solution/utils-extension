@@ -29,8 +29,6 @@ CREATE_GLOBALVARS();
 FunctionHook CCSPlayer_MovementServices_CheckJumpPre("CCSPlayer_MovementServices_CheckJumpPre", dyno::CallbackType::Pre, Hook_CCSPlayer_MovementServices_CheckJumpPre, "pp", 'v');
 FunctionHook CCSPlayer_MovementServices_CheckJumpPost("CCSPlayer_MovementServices_CheckJumpPre", dyno::CallbackType::Post, Hook_CCSPlayer_MovementServices_CheckJumpPre, "pp", 'v');
 
-ConVar* autobunnyhoppingcvar = nullptr;
-
 //////////////////////////////////////////////////////////////
 /////////////////          Core Class          //////////////
 ////////////////////////////////////////////////////////////
@@ -71,26 +69,13 @@ void UtilsExtension::Hook_ClientDisconnect(CPlayerSlot slot, ENetworkDisconnecti
     if ((bhop_state & (1ULL << slot.Get())) != 0) bhop_state &= ~(1ULL << slot.Get());
 }
 
-ConVar* FetchCVar(std::string cvarname)
-{
-    if (!icvar)
-        return nullptr;
-
-    ConVarHandle cvarHandle = icvar->FindConVar(cvarname.c_str());
-    if (!cvarHandle.IsValid())
-        return nullptr;
-
-    return icvar->GetConVar(cvarHandle);
-}
-
 dyno::ReturnAction Hook_CCSPlayer_MovementServices_CheckJumpPre(dyno::CallbackType cbType, dyno::IHook& hook)
 {
     void* services = hook.getArgument<void*>(0);
 
-    if (autobunnyhoppingcvar == nullptr)
-        autobunnyhoppingcvar = FetchCVar("sv_autobunnyhopping");
+    static CConVarRef<bool> sv_autobunnyhopping("sv_autobunnyhopping");
 
-    bool& autobunnyhopping = *reinterpret_cast<bool*>(&autobunnyhoppingcvar->values);
+    bool& autobunnyhopping = const_cast<bool&>(sv_autobunnyhopping.Get());
 
     if (!autobunnyhopping)
     {
@@ -98,6 +83,7 @@ dyno::ReturnAction Hook_CCSPlayer_MovementServices_CheckJumpPre(dyno::CallbackTy
         int pid = controller.GetEntryIndex() - 1;
         if ((bhop_state & (1ULL << pid)) != 0) {
             autobunnyhopping = (cbType == dyno::CallbackType::Pre);
+
             return dyno::ReturnAction::Ignored;
         }
     }
